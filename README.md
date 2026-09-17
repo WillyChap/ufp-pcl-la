@@ -36,13 +36,37 @@ Section 7 lists the limitations it implies.
 
 ## Install
 
+Use conda, and keep to one channel. `xarray`, `netCDF4` and `h5py` bind to native
+HDF5/netCDF libraries; pip wheels mixed into a conda environment can leave it with static
+archives but no shared objects, which surfaces much later as
+`ImportError: libffi.so.8: cannot open shared object file`.
+
 ```bash
-conda create -n ufp python=3.11 && conda activate ufp
-pip install -r requirements.txt
+conda env create -f environment.yml
+conda activate ufp-pcl
 ```
 
-Fetching the land-surface embedding additionally needs `earthengine-api` and `rioxarray`,
-and a Google Earth Engine account.
+Then install PyTorch separately, because its CUDA build has to match the GPU:
+
+```bash
+# CPU or Apple silicon
+pip install torch
+# CUDA -- pick the index for your CUDA version (cu128 or newer for Blackwell)
+pip install torch --index-url https://download.pytorch.org/whl/cu130
+```
+
+Check the architecture is supported before training. The list must contain your GPU's
+compute capability, or the first kernel launch fails with "no kernel image is available":
+
+```bash
+python -c "import torch; print(torch.cuda.get_arch_list())"
+```
+
+`requirements.txt` is the pip-only equivalent if you would rather not use conda; install
+torch first, as above.
+
+`environment.yml` already includes the data-preparation dependencies. Fetching the
+land-surface embedding additionally needs a Google Earth Engine account.
 
 ## Getting the data
 
