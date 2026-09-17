@@ -1,0 +1,44 @@
+# Conda environment for HPC and anywhere else with native-library headaches.
+#
+#   conda env create -f environment.yml
+#   conda activate ufp-pcl
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+#
+# Why conda rather than pip alone: xarray, netCDF4 and h5py bind to native
+# HDF5/netCDF libraries, and pip wheels mixed into a conda environment can leave
+# it with static archives but no shared objects -- the failure looks like
+# "ImportError: libffi.so.8: cannot open shared object file", which no amount of
+# editing requirements.txt will fix.  Keep one channel (conda-forge) and install
+# only torch from outside it.
+#
+# torch is deliberately NOT listed here.  Its CUDA build must match the GPU:
+# pick the index URL for your CUDA version, then check the architecture is
+# supported before training:
+#
+#   python -c "import torch; print(torch.cuda.get_arch_list())"
+#
+# e.g. an RTX PRO 6000 (Blackwell) needs sm_120, which requires cu128 or newer.
+name: ufp-pcl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  # core: needed to train and evaluate
+  - numpy>=1.26
+  - xarray>=2024.1
+  - netcdf4>=1.6
+  - cftime>=1.6
+  - scikit-learn>=1.4
+  - pyyaml>=6.0
+  - matplotlib>=3.8
+  - pandas>=2.0
+  # data preparation only (scripts/fetch_*.py, prepare_*.py, road_density.py)
+  - scipy>=1.11
+  - h5py>=3.10
+  - requests>=2.31
+  - zarr>=2.16
+  - s3fs>=2024.2
+  - rioxarray>=0.15
+  - pip
+  - pip:
+      - earthengine-api>=0.1.390

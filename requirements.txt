@@ -1,11 +1,32 @@
-# Core pipeline
+# pip-only install.  On HPC or anywhere with native-library trouble, prefer
+# environment.yml -- see the note there about libffi/HDF5.
+#
+# torch is listed unpinned because its CUDA build must match your GPU.  On a
+# CUDA machine install it from the PyTorch index FIRST, then run this file:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+#   pip install -r requirements.txt
+#   python -c "import torch; print(torch.cuda.get_arch_list())"
+#
+# The arch list must contain your GPU's compute capability (Blackwell = sm_120),
+# otherwise training fails with "no kernel image is available for execution".
+
+# --- core: train, evaluate, map ---
 torch>=2.4
 numpy>=1.26
 xarray>=2024.1
 netCDF4>=1.6
+cftime>=1.6
 scikit-learn>=1.4
 pyyaml>=6.0
 matplotlib>=3.8
+pandas>=2.0          # scripts/full_workup.py, scripts/eigen_workup.py
 
-# Optional, for reading the reference PDFs in the repo root
-# pymupdf>=1.24
+# --- data preparation only; not needed to train from prepared inputs ---
+# scipy>=1.11         # road_density, regrid_goes, fetch_traffic, prepare_alphaearth
+# h5py>=3.10          # fetch_hrrr
+# requests>=2.31      # fetch_traffic
+# zarr>=2.16          # fetch_hrrr
+# s3fs>=2024.2        # fetch_hrrr
+# rioxarray>=0.15     # prepare_alphaearth
+# earthengine-api     # export_alphaearth_gee
