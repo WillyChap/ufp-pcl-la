@@ -1,0 +1,7 @@
+# Input data is large and freely re-fetchable; see README for the commands.
+data/
+outputs/*/best.pt
+!outputs/m_final/best.pt
+__pycache__/
+*.pyc
+.DS_Store

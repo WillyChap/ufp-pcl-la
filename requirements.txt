@@ -1,0 +1,11 @@
+# Core pipeline
+torch>=2.4
+numpy>=1.26
+xarray>=2024.1
+netCDF4>=1.6
+scikit-learn>=1.4
+pyyaml>=6.0
+matplotlib>=3.8
+
+# Optional, for reading the reference PDFs in the repo root
+# pymupdf>=1.24

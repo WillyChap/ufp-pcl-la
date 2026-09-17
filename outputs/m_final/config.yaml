@@ -1,0 +1,194 @@
+data:
+  path: HARMONIZED_MASTER_FILES/UFP_MASTER.nc
+  aux_paths:
+  - HARMONIZED_MASTER_FILES/TEMPO_MASTER.nc
+  - HARMONIZED_MASTER_FILES/ERA5_MASTER.nc
+  - HARMONIZED_MASTER_FILES/MERRA_MASTER.nc
+  - HARMONIZED_MASTER_FILES/GEOS_MASTER.nc
+  - data/real/goes_aod.nc
+  - data/real/traffic_la.nc
+  - data/real/roads_la.nc
+  - data/real/hrrr_la.nc
+  - data/real/alphaearth_la_30m.nc
+  coords:
+    lon: longitude
+    lat: latitude
+    time: time
+  target:
+    var: UFP
+    mode: points
+    transform: log10
+    site_var: site
+    units: particles cm-3
+    scale: 1000.0
+  obs_vars:
+  - road_w_0p3km
+  - road_w_1p0km
+  - truck5_intensity
+  - road_dist_km
+  - hrrr_blh
+  - hrrr_ssrd
+  - hrrr_t2m
+  - hrrr_rh
+  - hrrr_u10
+  - hrrr_v10
+  - hrrr_tcc
+  - VCD_NO2
+  - VCD_HCHO
+  - blh
+  - t2m
+  - d2m
+  - u10
+  - v10
+  - sp
+  - ssrd
+  - lcc
+  - tp
+  - BCSMASS
+  - OCSMASS
+  - SO4SMASS
+  - SO2SMASS
+  - DUSMASS25
+  - SSSMASS25
+  - co
+  - o3
+  - so2
+  - isop
+  - benz
+  - tolu
+  - pan
+  - noy
+  - nh3
+  - pm25_rh35_gcc
+  - pm25su_rh35_gcc
+  - pm25oc_rh35_gcc
+  - pm25soa_rh35_gc
+  proxy_vars:
+  - goes_aod
+  proxy_weights: []
+  proxy_transform:
+    goes_aod: log1p
+  proxy_require_all: false
+  interp: bilinear
+  seq_len: 1
+  drop_nan_obs: true
+  derived:
+  - fnr
+  - solar_elev
+  - blh_dilution
+  - wind_speed
+  - wind_dir_sin
+  - wind_dir_cos
+  - rh_proxy
+  - temp_c
+  daylight_only: true
+  solar_elevation_min: 5.0
+  valid_ranges:
+    VCD_NO2:
+    - 0.0
+    - 1.0e17
+    VCD_HCHO:
+    - 0.0
+    - 2.0e17
+    goes_aod:
+    - -0.05
+    - 5.0
+  climo_vars:
+  - log:road_w_0p3km
+  - log:road_w_1p0km
+  - log:truck5_intensity
+  - log:truck5_nearest
+  - log:aadt_intensity
+  - road_dist_km
+  - emb_heterogeneity
+  climo_extra: data/real/mates_ufp.nc
+  climo_extra_var: ufp_geomean
+  climo_signs:
+    road_w_: 1.0
+    truck5: 1.0
+    aadt: 1.0
+    road_dist_km: -1.0
+  climo_max_terms: 2
+  climo_clip: true
+  domain:
+  - -118.6
+  - -117.0
+  - 33.65
+  - 34.3
+  time_stride: 1
+  time_range:
+  - '2023-08-02'
+  - '2025-06-18'
+split:
+  kind: blocked_time
+  test_frac: 0.2
+  val_frac: 0.15
+  seed: 0
+  holdout_site: null
+  block_days: 7
+  delta: 0.25
+  offset_index: 0
+  swap: false
+model:
+  location:
+    dim: 256
+    n_scales: 4
+    sigma_min: 1.0
+    sigma_max: 256.0
+    n_frequencies: 64
+    hidden: 512
+    n_layers: 2
+    dropout: 0.0
+    length_scale_km: 25.0
+    source: hybrid
+    pretrained_path: data/real/alphaearth_la_30m.nc
+    pretrained_vars: []
+    pretrained_prefix: emb_
+    pretrained_adapter_hidden: 128
+  time:
+    enabled: true
+    dim: 64
+    n_harmonics: 6
+    n_frequencies: 32
+    hidden: 128
+    use_year: true
+    use_hour: true
+    n_hour_harmonics: 3
+    use_dayofweek: true
+  obs:
+    kind: auto
+    dim: 256
+    hidden: 256
+    n_layers: 3
+    dropout: 0.1
+    lstm_hidden: 128
+    lstm_layers: 3
+  pred_head:
+    hidden: 256
+    n_layers: 2
+    dropout: 0.1
+  proxy_head:
+    hidden: 256
+    n_layers: 2
+    dropout: 0.1
+  variant: climo_anomaly
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 0.0003
+  weight_decay: 0.1
+  grad_clip: 1.0
+  location_weight_decay: 8.0
+  coord_jitter_km: 0.0
+  lam: 1.0
+  rho: 16
+  proxy_at_label_sites: false
+  proxy_pretrain_epochs: 50
+  patience: 25
+  lr_patience: 6
+  lr_factor: 0.5
+  num_workers: 0
+  device: auto
+  seed: 0
+  out_dir: outputs/real/m_final
+  log_every: 1

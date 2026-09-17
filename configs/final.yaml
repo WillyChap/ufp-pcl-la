@@ -1,0 +1,183 @@
+# Final model: hourly ultrafine particle number over the Los Angeles basin.
+#
+#   log10 N(place, time) = climatology(place) + anomaly(chemistry, meteorology, time)
+#
+# The climatology is a sign-constrained ridge fit on site means, using the seven AB-617
+# monitors plus six historical MATES sites.  The anomaly is the proxy-consistency
+# architecture.  See REPORT.md for the evaluation and the reasoning behind each choice.
+#
+#   python -m ufp_pcl train configs/final.yaml --set train.out_dir=outputs/m_final
+
+data:
+  path: HARMONIZED_MASTER_FILES/UFP_MASTER.nc
+  aux_paths:
+    - HARMONIZED_MASTER_FILES/TEMPO_MASTER.nc     # 102x102 @ 0.02 deg, daylight only
+    - HARMONIZED_MASTER_FILES/ERA5_MASTER.nc      # 10x10 @ 0.25 deg, the only source of blh
+    - HARMONIZED_MASTER_FILES/MERRA_MASTER.nc     # 6x5, aerosol composition
+    - HARMONIZED_MASTER_FILES/GEOS_MASTER.nc      # 10x10, chemical hindcast (lev=72 squeezed)
+    - data/goes_aod.nc                       # the proxy, on TEMPO's grid
+    - data/traffic_la.nc                     # static ~220 m, climatology inputs
+    - data/roads_la.nc                       # class-weighted road density (climatology input)
+    - data/hrrr_la.nc                        # 3 km hourly meteorology (observation input)
+    - data/alphaearth_la_30m.nc              # also the location prior; emb_heterogeneity feeds climo                     # static ~220 m: OSM + Caltrans AADT/truck
+
+  coords: {lon: longitude, lat: latitude, time: time}
+  target:
+    var: UFP
+    mode: points
+    site_var: site
+    transform: log10
+    # archived as counts/cm3 / 1000; native-unit metrics should be in counts/cm3
+    scale: 1000.0
+    units: particles cm-3
+
+  # Every source pads its record to a common length by repeating its final field, which
+  # would present up to 12 days of frozen meteorology and a frozen AOD map as real data.
+  # MERRA is the shortest honest record, so it sets the end of the window.
+  domain: [-118.60, -117.00, 33.65, 34.30]
+  time_range: ["2023-08-02", "2025-06-18"]
+
+  # Retrieval outliers: TEMPO VCDs reach 3e17 molec/cm2, roughly 5x anything physical,
+  # and one such value survives standardisation as an enormous z-score.
+  valid_ranges:
+    VCD_NO2:  [0.0, 1.0e17]
+    VCD_HCHO: [0.0, 2.0e17]
+    goes_aod: [-0.05, 5.0]
+
+  obs_vars:
+    # Traffic enters the OBSERVATION encoder as well as the climatology.  The earlier
+    # version excluded it on the grounds that a static site-distinguishing field is a
+    # seven-monitor fingerprint -- but the overfitting work located the memorisation in
+    # the LOCATION branch (obs_only trains to epoch 32, every other arm to epoch 2), so
+    # the observation encoder was never the exposure.  The cost of the exclusion is real:
+    # an additive climatology can say "this place is busier", but only the observation
+    # encoder can say "busy roads matter more when the boundary layer has collapsed".
+    - road_w_0p3km
+    - road_w_1p0km
+    - truck5_intensity
+    - road_dist_km
+    - hrrr_blh
+    - hrrr_ssrd
+    - hrrr_t2m
+    - hrrr_rh
+    - hrrr_u10
+    - hrrr_v10
+    - hrrr_tcc
+    # --- TEMPO: the observed columns.  Deliberately the ONLY variables whose names
+    #     contain "no2"/"hcho", so the derived FNR ratio below is unambiguously the
+    #     satellite-observed one rather than a model surrogate.
+    - VCD_NO2
+    - VCD_HCHO
+    # --- ERA5: dilution and ventilation
+    - blh
+    - t2m
+    - d2m
+    - u10
+    - v10
+    - sp
+    - ssrd
+    - lcc
+    - tp
+    # --- MERRA-2: aerosol composition, the condensation sink UFP grows onto
+    - BCSMASS
+    - OCSMASS
+    - SO4SMASS
+    - SO2SMASS
+    - DUSMASS25
+    - SSSMASS25
+    # --- GEOS-CF: chemistry TEMPO cannot see (surface, lev=72)
+    - co
+    - o3
+    - so2
+    - isop
+    - benz
+    - tolu
+    - pan
+    - noy
+    - nh3
+    - pm25_rh35_gcc
+    - pm25su_rh35_gcc
+    - pm25oc_rh35_gcc
+    - pm25soa_rh35_gc
+
+  # Static predictors for the climatology only -- sampled separately, never handed to
+  # the observation encoder, where a site-distinguishing static field would be a
+  # seven-monitor fingerprint in the one branch no regulariser reaches.
+  climo_vars:
+    # road_w_0p3km correlates +0.895 with site-mean UFP, against +0.831 for the
+    # freeway-only truck intensity the first version selected, and the decay across radii
+    # (+0.895 at 300 m, +0.444 at 1 km, -0.03 at 3 km) is the near-road gradient itself.
+    - log:road_w_0p3km
+    - log:road_w_1p0km
+    - log:truck5_intensity
+    - log:truck5_nearest
+    - log:aadt_intensity
+    - road_dist_km
+    - emb_heterogeneity
+  climo_extra: data/mates_ufp.nc
+  climo_extra_var: ufp_geomean
+  climo_max_terms: 2
+  climo_clip: true
+
+  proxy_vars: [goes_aod]
+  proxy_transform: {goes_aod: log1p}
+
+  derived: [fnr, solar_elev, blh_dilution, wind_speed, wind_dir_sin, wind_dir_cos, rh_proxy, temp_c]
+
+  interp: bilinear
+  seq_len: 1
+  drop_nan_obs: true
+  # TEMPO and GOES both retrieve in daylight only; night hours would train the observation
+  # encoder on fill values and give the proxy nothing to constrain.
+  daylight_only: true
+  solar_elevation_min: 5.0
+
+split:
+  # Weekly blocks assigned round-robin, so train/val/test each span every season.  A
+  # contiguous cut over this 22-month record makes val winter-only and test spring-only,
+  # which is a larger effect than anything being compared here.  Use kind: temporal to
+  # quote a forecasting number, and loso for the spatial claim.
+  # LOSO: the only split where better spatial predictors can show their value.  On
+  # blocked_time the location encoder has memorised the seven coordinates and the ceiling
+  # for ANY spatial improvement is +0.016 R2.
+  kind: blocked_time
+  block_days: 7
+  test_frac: 0.2
+  val_frac: 0.15
+  seed: 0
+
+model:
+  variant: climo_anomaly
+  location:
+    source: hybrid
+    pretrained_path: data/alphaearth_la_30m.nc
+    pretrained_prefix: emb_
+    pretrained_adapter_hidden: 128
+    dim: 256
+    n_scales: 4
+    n_frequencies: 64
+    hidden: 512
+    length_scale_km: 25.0   # basin ~100 km across; smallest scale ~0.08 km
+  time:
+    enabled: true
+    use_hour: true
+    use_dayofweek: true     # the weekday/weekend contrast is the primary/secondary lever
+  obs:
+    hidden: 256
+    n_layers: 3
+
+train:
+  epochs: 200
+  batch_size: 256
+  lr: 3.0e-4
+  # The synthetic testbed showed the paper's 0.2 (tuned on 996 CONUS stations) is far too
+  # weak for a 7-site basin, and that lambda cannot be tuned on held-out monitor error.
+  location_weight_decay: 8.0   # decoupled: +0.018 test R2 over 3 seeds, and halves run-to-run variance
+  weight_decay: 0.1
+  lam: 1.0
+  rho: 16
+  proxy_at_label_sites: false
+  proxy_pretrain_epochs: 50
+  patience: 25
+  device: auto
+  seed: 0
