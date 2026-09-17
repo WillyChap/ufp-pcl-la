@@ -1,5 +1,8 @@
 # Input data is large and freely re-fetchable; see README for the commands.
-data/
+# Leading slash anchors these to the repo root -- an unanchored "data/" also
+# matches ufp_pcl/data/, which silently dropped that subpackage from the repo.
+/data/
+/HARMONIZED_MASTER_FILES/
 outputs/*/best.pt
 !outputs/m_final/best.pt
 __pycache__/

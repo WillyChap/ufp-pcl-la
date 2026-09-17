@@ -120,13 +120,21 @@ DATA_WISHLIST.md           what this model is missing, ranked — plus proposal 
 PROXY_TARGETS.md           why GOES AOD is the proxy, what was tested, what to acquire next
 ```
 
-Paths in the configs are relative to the directory you run from, and expect two data
-roots alongside the ones above (neither is redistributed here; both are gitignored):
+Paths in the configs are relative to the directory you run from, and expect a single
+`data/` tree alongside the directories above. It is not redistributed here and is
+gitignored in full:
 
 ```
-HARMONIZED_MASTER_FILES/   UFP_MASTER.nc and the satellite/reanalysis masters
-                           (TEMPO, ERA5, MERRA, GEOS)
-data/                      everything the scripts above build: goes_aod.nc,
-                           hrrr_la.nc, traffic_la.nc, roads_la.nc,
-                           alphaearth_la_30m.nc, mates_ufp.nc
+data/
+    HARMONIZED_MASTER_FILES/   UFP_MASTER.nc and the satellite/reanalysis
+                               masters (TEMPO, ERA5, MERRA, GEOS)   ~3.0 GB
+    alphaearth_la_30m.nc       land-surface embedding, 30 m          737 MB
+    hrrr_la.nc                 3 km hourly meteorology               177 MB
+    goes_aod.nc                the proxy                              81 MB
+    traffic_la.nc              OSM + Caltrans AADT                     5 MB
+    roads_la.nc                class-weighted road density             2 MB
+    mates_ufp.nc               historical sites for the climatology
+    mates_ufp_daylight.nc      same, daylight hours, for validation
 ```
+
+12 files, about 4.0 GB in total.
