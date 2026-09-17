@@ -117,6 +117,7 @@ outputs/m_final/           trained weights, metrics, analysis
 figures/                   report figures
 REPORT.md                  the write-up
 DATA_WISHLIST.md           what this model is missing, ranked — plus proposal ideas
+PROXY_TARGETS.md           why GOES AOD is the proxy, what was tested, what to acquire next
 ```
 
 Paths in the configs are relative to the directory you run from, and expect two data

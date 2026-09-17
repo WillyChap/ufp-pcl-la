@@ -255,34 +255,52 @@ Surface NO₂ passes the other three tests as well:
 - **Density.** 21 NO₂ stations against 7 UFP monitors — three times the spatial degrees of
   freedom, which is the binding constraint identified in item 2.
 
-**The low-hanging fruit, in order of cost.**
+**These ideas were tested. They do not work — see the note below before acting on them.**
 
-*Free, today.* Swap the proxy from satellite column to surface NO₂. The data is already
-downloaded (`data/aqs_42602.nc`). This is the single cheapest change on this entire document
-and, on the screening evidence, the one most likely to matter.
+The obvious moves were: swap the proxy from satellite column to surface NO₂ (the data is
+already downloaded); treat NO₂ as a multi-task target at its own 21 stations rather than
+gridding it; and add a state pathway to the proxy head so the anomaly correlation becomes
+usable. All three were implemented and evaluated over three seeds each.
 
-*Free, today.* `VCD_HCHO` is sitting unused in the TEMPO master file. It fails the anomaly test
-here, so it is not a proxy candidate — but that is itself worth knowing and took one run to
+### Outcome: the screening statistic above is the wrong one
+
+None of them helped, and the reason revises the criterion. The proxy head is
+`proxy_head(loc_encoder(coords))`, and the location encoder receives only coordinates and
+calendar features — no meteorology. It can therefore only ever represent
+`E[z | place, hour, day-of-year]`, the proxy's space-time **climatology**. However
+informative a proxy's anomalies are, the term as written cannot transfer them.
+
+What the proxy term actually supplies is large-scale spatial *organisation* to the location
+embedding, and that is invisible to every point metric. Measured over three seeds
+(`scripts/proxy_map_audit.py`):
+
+| arm | effective rank | \|PC1 ~ coastal distance\| | \|r\| solar |
+|---|---|---|---|
+| **GOES AOD, λ=1 (the released model)** | 6.86 ± 1.46 | **0.698 ± 0.072** | **0.724 ± 0.110** |
+| proxy term off (λ=0) | 4.26 ± 0.76 | 0.020 ± 0.015 | 0.173 ± 0.014 |
+| surface NO₂ at 21 stations | 8.69 ± 3.88 | 0.047 ± 0.015 | 0.404 ± 0.017 |
+| surface NO₂ + state-conditioned head | 7.84 ± 0.44 | 0.070 ± 0.046 | 0.323 ± 0.025 |
+
+Only GOES AOD recovers the coastal–inland and solar/photochemical modes — a 10–35× gap on the
+spatial mode, with non-overlapping spreads across all nine runs. Switching the proxy term off
+collapses the embedding's effective rank. Surface NO₂ keeps the latent space
+high-dimensional but not physically aligned.
+
+Point metrics point the other way and should not be trusted here: at λ=0 the MATES rank
+correlation is its best value anywhere (+0.029 against −0.275), and LOSO cannot separate the
+arms at all (−0.248 ± 0.18, −0.250 ± 0.22, −0.320 ± 0.18). This is why λ was never tunable on
+monitor error — **monitor error is the wrong instrument, not λ the wrong knob.**
+
+**So the released configuration stands: GOES AOD at λ = 1.** Its anomaly correlation with UFP
+is −0.060 and its 13-site climatology rank is −0.363; it is nonetheless the only proxy tested
+that preserves a physically interpretable model. A candidate proxy must be screened on
+`scripts/proxy_map_audit.py`, not on correlation with the target.
+
+`PROXY_TARGETS.md` documents the full investigation and the proxies worth acquiring next.
+
+One genuinely free finding survives: `VCD_HCHO` sits unused in the TEMPO master file. It fails
+the anomaly test (r = −0.079), so it is not a proxy candidate — worth knowing, one run to
 establish.
-
-*Cheap.* Add surface CO and NOₓ from the same AQS network, and black carbon where sites report
-it. Each adds stations and each is a primary-combustion tracer with a more direct physical link
-to ultrafine number than either column.
-
-*A design change rather than a data change, and the interesting one.* The proxy does **not**
-have to be a gridded field. What the consistency term needs is a quantity observed at more
-locations than the label, so that the location encoder is constrained at coordinates where no
-UFP measurement exists. Treating surface NO₂ as a multi-task target at its own 21 stations —
-rather than interpolating it to a grid, which would smooth it back toward the climatology the
-anomaly test just rejected — triples the number of distinct locations the spatial branch ever
-sees. Given that 34 of 38 predictors take three or fewer distinct values across the seven UFP
-monitors, this attacks the central constraint of the whole problem directly, and it costs no
-new observations at all.
-
-That last point generalises beyond this domain, and is probably the most useful thing here for
-the proxy-consistency literature: **the useful axis of a proxy is not that it is gridded, but
-that it is denser than the label.** A sparse, well-correlated in-situ network beats a
-continuous satellite field that is 96% climatology.
 
 ## 7. Hourly traffic volume instead of annual-average counts
 
